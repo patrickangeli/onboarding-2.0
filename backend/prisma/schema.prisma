@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- AUTENTICAÇÃO ---
+
+enum UserRole {
+  ADMIN   // RH master — vê tudo
+  HR      // RH interno — valida docs
+  PARTNER // Empresa terceirizada — vê fases liberadas
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(HR)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+}
+
+// --- EMPRESA PARCEIRA / TERCEIRIZADA ---
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users      User[]
+  employees  Employee[]
+
+  // Quais fases essa empresa pode visualizar
+  phaseAccess CompanyPhaseAccess[]
+}
+
+model CompanyPhaseAccess {
+  id        String  @id @default(uuid())
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  phase     Phase   @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  phaseId   String
+
+  @@unique([companyId, phaseId])
+}
+
+// --- PROCESSO DE ONBOARDING ---
+
+model OnboardingProcess {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  phases Phase[]
+}
+
+model Phase {
+  id        String @id @default(uuid())
+  title     String
+  order     Int
+
+  process   OnboardingProcess @relation(fields: [processId], references: [id])
+  processId String
+
+  questions    Question[]
+  employees    Employee[]         @relation("CurrentPhase")
+  companyAccess CompanyPhaseAccess[]
+}
+
+enum QuestionType {
+  TEXT
+  DATE
+  SELECT
+  FILE
+  CEP
+}
+
+model Question {
+  id       String       @id @default(uuid())
+  label    String
+  type     QuestionType
+  required Boolean      @default(true)
+  order    Int
+
+  phase   Phase  @relation(fields: [phaseId], references: [id])
+  phaseId String
+
+  options Option[]
+  answers Answer[]
+}
+
+model Option {
+  id         String   @id @default(uuid())
+  label      String
+  value      String
+  order      Int
+  question   Question @relation(fields: [questionId], references: [id])
+  questionId String
+}
+
+// --- CANDIDATO ---
+
+enum EmployeeStatus {
+  PENDING
+  IN_PROGRESS
+  DOCS_SENT
+  APPROVED
+  REJECTED
+}
+
+model Employee {
+  id        String         @id @default(uuid())
+  name      String?
+  email     String?
+  cpf       String         @unique
+  status    EmployeeStatus @default(PENDING)
+  feedback  String?
+  corrections Json         @default("[]")
+  createdAt DateTime       @default(now())
+
+  // Flag de acesso ao link
+  hasAccessed   Boolean   @default(false)
+  firstAccessAt DateTime?
+
+  currentPhase   Phase?  @relation("CurrentPhase", fields: [currentPhaseId], references: [id])
+  currentPhaseId String?
+
+  // Empresa responsável por esse candidato
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  address  Address?
+  answers  Answer[]
+  documents Document[]
+}
+
+model Address {
+  id           String  @id @default(uuid())
+  cep          String?
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String   @unique
+}
+
+model Answer {
+  id         String   @id @default(uuid())
+  value      String?
+  createdAt  DateTime @default(now())
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  question   Question @relation(fields: [questionId], references: [id])
+  questionId String
+
+  document Document?
+
+  @@unique([employeeId, questionId])
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  fileName   String
+  mimeType   String
+  fileData   Bytes
+  uploadedAt DateTime @default(now())
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  answer     Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  answerId   String   @unique
+}
