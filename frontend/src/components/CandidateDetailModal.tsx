@@ -1,10 +1,38 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 interface Props {
   candidateId: string;
   userRole: string;
   onClose: () => void;
+}
+
+function DocLinks({ documents }: { documents: { id: string; fileName: string; mimeType: string }[] }) {
+  if (!documents || documents.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {documents.map((doc) => {
+        const isPdf = doc.mimeType === 'application/pdf';
+        return (
+          <a
+            key={doc.id}
+            href={`${API_BASE}/api/file/${doc.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition"
+            style={isPdf
+              ? { color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }
+              : { color: '#0f766e', background: '#f0fdfa', borderColor: '#99f6e4' }
+            }
+          >
+            {isPdf ? '📄' : '🖼️'} {doc.fileName}
+          </a>
+        );
+      })}
+    </div>
+  );
 }
 
 export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) {
@@ -95,31 +123,37 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
                   <p className="text-slate-400 text-sm italic">Nenhuma resposta ainda.</p>
                 ) : (
                   <div className="space-y-2">
-                    {candidate.answers.map((ans: any) => (
-                      <div key={ans.id} className={`flex items-center justify-between p-3.5 rounded-xl border text-sm ${
-                        corrections.includes(ans.questionId) ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
-                      }`}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-slate-500 mb-0.5">{ans.question?.label}</p>
-                          {ans.value === 'ARQUIVO' && ans.document ? (
-                            <a href={`/api/file/${ans.id}`} target="_blank" className="text-teal-600 hover:underline font-semibold text-sm">
-                              📄 {ans.document.fileName}
-                            </a>
-                          ) : (
-                            <p className="font-semibold text-slate-800 truncate">
-                              {ans.question?.type === 'DATE' ? ans.value?.split('-').reverse().join('/') : ans.value}
-                            </p>
+                    {candidate.answers.map((ans: any) => {
+                      const hasFiles = ans.documents && ans.documents.length > 0;
+                      const isFileAnswer = ['FILE', 'MULTI_FILE'].includes(ans.question?.type);
+                      return (
+                        <div key={ans.id} className={`flex items-start justify-between p-3.5 rounded-xl border text-sm ${
+                          corrections.includes(ans.questionId) ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
+                        }`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-slate-500 mb-0.5">{ans.question?.label}</p>
+                            {hasFiles ? (
+                              <DocLinks documents={ans.documents} />
+                            ) : isFileAnswer ? (
+                              <p className="text-xs text-slate-400 italic">Nenhum arquivo enviado</p>
+                            ) : (
+                              <p className="font-semibold text-slate-800 truncate">
+                                {ans.question?.type === 'DATE'
+                                  ? ans.value?.split('-').reverse().join('/')
+                                  : ans.value}
+                              </p>
+                            )}
+                          </div>
+                          {userRole !== 'PARTNER' && (
+                            <input type="checkbox"
+                              checked={corrections.includes(ans.questionId)}
+                              onChange={() => toggleCorrection(ans.questionId)}
+                              className="ml-4 mt-1 w-4 h-4 accent-red-500 cursor-pointer flex-shrink-0"
+                              title="Marcar para correção" />
                           )}
                         </div>
-                        {userRole !== 'PARTNER' && (
-                          <input type="checkbox"
-                            checked={corrections.includes(ans.questionId)}
-                            onChange={() => toggleCorrection(ans.questionId)}
-                            className="ml-4 w-4 h-4 accent-red-500 cursor-pointer"
-                            title="Marcar para correção" />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -144,7 +178,7 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
                       ✓ Aprovar
                     </button>
                     <button onClick={remove}
-                      className="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl text-sm transition border border-red-200">
+                      className="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl text-sm border border-red-200 transition">
                       Excluir
                     </button>
                   </div>
