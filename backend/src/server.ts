@@ -40,8 +40,7 @@ function authMiddleware(roles: string[] = []) {
 // AUTH
 // -----------------------------------------------
 
-// Login
-app.post('/auth/login', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { email }, include: { company: true } });
@@ -63,10 +62,10 @@ app.post('/auth/login', async (req, res) => {
 });
 
 // -----------------------------------------------
-// PROCESSO (estrutura do formulário)
+// PROCESSO
 // -----------------------------------------------
 
-app.get('/process/:id/structure', async (req, res) => {
+app.get('/api/process/:id/structure', async (req, res) => {
   const { id } = req.params;
   try {
     const process = await prisma.onboardingProcess.findUnique({
@@ -91,11 +90,10 @@ app.get('/process/:id/structure', async (req, res) => {
 });
 
 // -----------------------------------------------
-// CANDIDATO — acesso via CPF
+// CANDIDATO
 // -----------------------------------------------
 
-// Checar CPF (registra flag de acesso ao link)
-app.get('/employee/check-cpf/:cpf', async (req, res) => {
+app.get('/api/employee/check-cpf/:cpf', async (req, res) => {
   const cpfLimpo = req.params.cpf.replace(/\D/g, '');
   try {
     const employee = await prisma.employee.findUnique({
@@ -104,7 +102,6 @@ app.get('/employee/check-cpf/:cpf', async (req, res) => {
     });
     if (!employee) return res.status(404).json({ error: 'CPF não encontrado' });
 
-    // Marca acesso ao link se for a primeira vez
     if (!employee.hasAccessed) {
       await prisma.employee.update({
         where: { cpf: cpfLimpo },
@@ -118,8 +115,7 @@ app.get('/employee/check-cpf/:cpf', async (req, res) => {
   }
 });
 
-// Criar candidato
-app.post('/employee', async (req, res) => {
+app.post('/api/employee', async (req, res) => {
   const { name, email, cpf, processId } = req.body;
   try {
     const cpfLimpo = cpf.replace(/\D/g, '');
@@ -139,8 +135,7 @@ app.post('/employee', async (req, res) => {
   }
 });
 
-// Detalhes do candidato
-app.get('/employee/:id/details', async (req, res) => {
+app.get('/api/employee/:id/details', async (req, res) => {
   const { id } = req.params;
   try {
     const employee = await prisma.employee.findUnique({
@@ -164,8 +159,7 @@ app.get('/employee/:id/details', async (req, res) => {
   }
 });
 
-// Salvar endereço
-app.post('/employee/address', async (req, res) => {
+app.post('/api/employee/address', async (req, res) => {
   const { employeeId, cep, street, number, complement, neighborhood, city, state } = req.body;
   try {
     const address = await prisma.address.upsert({
@@ -179,8 +173,7 @@ app.post('/employee/address', async (req, res) => {
   }
 });
 
-// Avançar fase
-app.post('/next-step', async (req, res) => {
+app.post('/api/next-step', async (req, res) => {
   const { employeeId } = req.body;
   try {
     const employee = await prisma.employee.findUnique({
@@ -213,8 +206,7 @@ app.post('/next-step', async (req, res) => {
   }
 });
 
-// Upload de arquivo
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   const { employeeId, questionId } = req.body as any;
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -242,8 +234,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Visualizar arquivo
-app.get('/file/:answerId', async (req, res) => {
+app.get('/api/file/:answerId', async (req, res) => {
   try {
     const doc = await prisma.document.findUnique({ where: { answerId: req.params.answerId } });
     if (!doc) return res.status(404).json({ error: 'Arquivo não encontrado' });
@@ -255,8 +246,7 @@ app.get('/file/:answerId', async (req, res) => {
   }
 });
 
-// Salvar resposta de texto
-app.post('/answer/text', async (req, res) => {
+app.post('/api/answer/text', async (req, res) => {
   const { employeeId, questionId, value } = req.body;
   try {
     const answer = await prisma.answer.upsert({
@@ -274,8 +264,7 @@ app.post('/answer/text', async (req, res) => {
 // RH / ADMIN — rotas protegidas
 // -----------------------------------------------
 
-// Listar candidatos (ADMIN/HR vê todos, PARTNER vê só da sua empresa)
-app.get('/employees', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req: any, res) => {
+app.get('/api/employees', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req: any, res) => {
   try {
     const where = req.user.role === 'PARTNER' ? { companyId: req.user.companyId } : {};
     const employees = await prisma.employee.findMany({
@@ -289,8 +278,7 @@ app.get('/employees', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req: an
   }
 });
 
-// Feedback do RH
-app.post('/employee/:id/feedback', authMiddleware(['ADMIN', 'HR']), async (req, res) => {
+app.post('/api/employee/:id/feedback', authMiddleware(['ADMIN', 'HR']), async (req, res) => {
   const { feedback, corrections } = req.body;
   try {
     const employee = await prisma.employee.update({
@@ -303,8 +291,7 @@ app.post('/employee/:id/feedback', authMiddleware(['ADMIN', 'HR']), async (req, 
   }
 });
 
-// Aprovar candidato
-app.post('/employee/:id/approve', authMiddleware(['ADMIN', 'HR']), async (req, res) => {
+app.post('/api/employee/:id/approve', authMiddleware(['ADMIN', 'HR']), async (req, res) => {
   try {
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
@@ -316,8 +303,7 @@ app.post('/employee/:id/approve', authMiddleware(['ADMIN', 'HR']), async (req, r
   }
 });
 
-// Deletar candidato
-app.delete('/employee/:id', authMiddleware(['ADMIN']), async (req, res) => {
+app.delete('/api/employee/:id', authMiddleware(['ADMIN']), async (req, res) => {
   try {
     await prisma.employee.delete({ where: { id: req.params.id } });
     return res.json({ message: 'Candidato removido.' });
@@ -330,8 +316,7 @@ app.delete('/employee/:id', authMiddleware(['ADMIN']), async (req, res) => {
 // GESTÃO DE EMPRESAS (só ADMIN)
 // -----------------------------------------------
 
-// Listar empresas
-app.get('/companies', authMiddleware(['ADMIN']), async (req, res) => {
+app.get('/api/companies', authMiddleware(['ADMIN']), async (req, res) => {
   try {
     const companies = await prisma.company.findMany({
       include: { _count: { select: { employees: true, users: true } }, phaseAccess: { include: { phase: true } } }
@@ -342,8 +327,7 @@ app.get('/companies', authMiddleware(['ADMIN']), async (req, res) => {
   }
 });
 
-// Criar empresa
-app.post('/companies', authMiddleware(['ADMIN']), async (req, res) => {
+app.post('/api/companies', authMiddleware(['ADMIN']), async (req, res) => {
   const { name, slug, phaseIds } = req.body;
   try {
     const company = await prisma.company.create({
@@ -359,8 +343,7 @@ app.post('/companies', authMiddleware(['ADMIN']), async (req, res) => {
   }
 });
 
-// Listar usuários
-app.get('/users', authMiddleware(['ADMIN']), async (req, res) => {
+app.get('/api/users', authMiddleware(['ADMIN']), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, active: true, company: true }
@@ -371,8 +354,7 @@ app.get('/users', authMiddleware(['ADMIN']), async (req, res) => {
   }
 });
 
-// Criar usuário
-app.post('/users', authMiddleware(['ADMIN']), async (req, res) => {
+app.post('/api/users', authMiddleware(['ADMIN']), async (req, res) => {
   const { name, email, password, role, companyId } = req.body;
   try {
     const passwordHash = await bcrypt.hash(password, 10);
