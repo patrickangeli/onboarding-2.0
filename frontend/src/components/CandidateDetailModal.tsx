@@ -3,6 +3,10 @@ import api from '../api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Labels que pertencem ao grupo Endereço
+const ADDRESS_LABELS = ['CEP', 'Rua', 'Número', 'Complemento', 'Bairro', 'Cidade', 'Estado'];
+const ADDRESS_GROUP_ID = '__address_group__';
+
 interface Props {
   candidateId: string;
   userRole: string;
@@ -54,6 +58,16 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
   const toggleCorrection = (id: string) =>
     setCorrections(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
+  // Marcar/desmarcar todos os campos de endereço de uma vez
+  const toggleAddressGroup = (questionIds: string[]) => {
+    const allMarked = questionIds.every(id => corrections.includes(id));
+    if (allMarked) {
+      setCorrections(prev => prev.filter(id => !questionIds.includes(id)));
+    } else {
+      setCorrections(prev => [...new Set([...prev, ...questionIds])]);
+    }
+  };
+
   const sendFeedback = async () => {
     setSaving(true);
     try {
@@ -86,107 +100,144 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {loading ? (
           <div className="p-12 text-center text-slate-400">Carregando...</div>
-        ) : (
-          <>
-            <div className="bg-teal-600 px-6 py-5 text-white relative rounded-t-2xl">
-              <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white text-xl">✕</button>
-              <h2 className="text-xl font-bold">{candidate.name || 'Candidato'}</h2>
-              <p className="text-teal-100 text-sm mt-0.5">{candidate.email} · CPF {candidate.cpf}</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {candidate.hasAccessed ? (
-                  <span className="text-xs bg-white/20 text-white px-2.5 py-1 rounded-full">
-                    ✓ Link acessado{candidate.firstAccessAt ? ` em ${new Date(candidate.firstAccessAt).toLocaleDateString('pt-BR')}` : ''}
-                  </span>
-                ) : (
-                  <span className="text-xs bg-white/10 text-white/60 px-2.5 py-1 rounded-full">Link não acessado</span>
-                )}
-                {candidate.company && (
-                  <span className="text-xs bg-white/20 text-white px-2.5 py-1 rounded-full">🏢 {candidate.company.name}</span>
-                )}
-              </div>
-            </div>
+        ) : (() => {
+          // Separar respostas de endereço das demais
+          const addressAnswers = candidate.answers.filter((a: any) =>
+            ADDRESS_LABELS.includes(a.question?.label)
+          );
+          const otherAnswers = candidate.answers.filter((a: any) =>
+            !ADDRESS_LABELS.includes(a.question?.label)
+          );
+          const addressQuestionIds = addressAnswers.map((a: any) => a.questionId);
+          const addressGroupMarked = addressQuestionIds.length > 0 &&
+            addressQuestionIds.every((id: string) => corrections.includes(id));
 
-            <div className="p-6 space-y-6">
-              {candidate.address && (
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Endereço</h3>
-                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-sm">
-                    <p className="font-medium text-slate-800">{candidate.address.street}, {candidate.address.number}{candidate.address.complement ? ` — ${candidate.address.complement}` : ''}</p>
-                    <p className="text-slate-500 mt-1">{candidate.address.neighborhood} · {candidate.address.city}/{candidate.address.state} · CEP {candidate.address.cep}</p>
-                  </div>
+          return (
+            <>
+              <div className="bg-teal-600 px-6 py-5 text-white relative rounded-t-2xl">
+                <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white text-xl">✕</button>
+                <h2 className="text-xl font-bold">{candidate.name || 'Candidato'}</h2>
+                <p className="text-teal-100 text-sm mt-0.5">{candidate.email} · CPF {candidate.cpf}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {candidate.hasAccessed ? (
+                    <span className="text-xs bg-white/20 text-white px-2.5 py-1 rounded-full">
+                      ✓ Link acessado{candidate.firstAccessAt ? ` em ${new Date(candidate.firstAccessAt).toLocaleDateString('pt-BR')}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-white/10 text-white/60 px-2.5 py-1 rounded-full">Link não acessado</span>
+                  )}
+                  {candidate.company && (
+                    <span className="text-xs bg-white/20 text-white px-2.5 py-1 rounded-full">🏢 {candidate.company.name}</span>
+                  )}
                 </div>
-              )}
+              </div>
 
-              <div>
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Respostas</h3>
-                {candidate.answers.length === 0 ? (
-                  <p className="text-slate-400 text-sm italic">Nenhuma resposta ainda.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {candidate.answers.map((ans: any) => {
-                      const hasFiles = ans.documents && ans.documents.length > 0;
-                      const isFileAnswer = ['FILE', 'MULTI_FILE'].includes(ans.question?.type);
-                      return (
-                        <div key={ans.id} className={`flex items-start justify-between p-3.5 rounded-xl border text-sm ${
-                          corrections.includes(ans.questionId) ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
-                        }`}>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-slate-500 mb-0.5">{ans.question?.label}</p>
-                            {hasFiles ? (
-                              <DocLinks documents={ans.documents} />
-                            ) : isFileAnswer ? (
-                              <p className="text-xs text-slate-400 italic">Nenhum arquivo enviado</p>
-                            ) : (
-                              <p className="font-semibold text-slate-800 truncate">
-                                {ans.question?.type === 'DATE'
-                                  ? ans.value?.split('-').reverse().join('/')
-                                  : ans.value}
-                              </p>
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Respostas</h3>
+                  {candidate.answers.length === 0 ? (
+                    <p className="text-slate-400 text-sm italic">Nenhuma resposta ainda.</p>
+                  ) : (
+                    <div className="space-y-2">
+
+                      {/* Respostas comuns (não endereço) */}
+                      {otherAnswers.map((ans: any) => {
+                        const hasFiles = ans.documents && ans.documents.length > 0;
+                        const isFileAnswer = ['FILE', 'MULTI_FILE'].includes(ans.question?.type);
+                        return (
+                          <div key={ans.id} className={`flex items-start justify-between p-3.5 rounded-xl border text-sm ${
+                            corrections.includes(ans.questionId) ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
+                          }`}>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-slate-500 mb-0.5">{ans.question?.label}</p>
+                              {hasFiles ? (
+                                <DocLinks documents={ans.documents} />
+                              ) : isFileAnswer ? (
+                                <p className="text-xs text-slate-400 italic">Nenhum arquivo enviado</p>
+                              ) : (
+                                <p className="font-semibold text-slate-800 truncate">
+                                  {ans.question?.type === 'DATE'
+                                    ? ans.value?.split('-').reverse().join('/')
+                                    : ans.value}
+                                </p>
+                              )}
+                            </div>
+                            {userRole !== 'PARTNER' && (
+                              <input type="checkbox"
+                                checked={corrections.includes(ans.questionId)}
+                                onChange={() => toggleCorrection(ans.questionId)}
+                                className="ml-4 mt-1 w-4 h-4 accent-red-500 cursor-pointer flex-shrink-0"
+                                title="Marcar para correção" />
                             )}
                           </div>
-                          {userRole !== 'PARTNER' && (
-                            <input type="checkbox"
-                              checked={corrections.includes(ans.questionId)}
-                              onChange={() => toggleCorrection(ans.questionId)}
-                              className="ml-4 mt-1 w-4 h-4 accent-red-500 cursor-pointer flex-shrink-0"
-                              title="Marcar para correção" />
-                          )}
+                        );
+                      })}
+
+                      {/* Bloco agrupado de endereço */}
+                      {addressAnswers.length > 0 && (
+                        <div className={`rounded-xl border text-sm ${
+                          addressGroupMarked ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
+                        }`}>
+                          <div className="flex items-center justify-between px-3.5 pt-3 pb-2 border-b border-slate-200">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">📍 Endereço</p>
+                            {userRole !== 'PARTNER' && (
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={addressGroupMarked}
+                                  onChange={() => toggleAddressGroup(addressQuestionIds)}
+                                  className="w-4 h-4 accent-red-500 cursor-pointer"
+                                  title="Marcar endereço para correção"
+                                />
+                                <span className="text-xs text-slate-400">Solicitar correção</span>
+                              </label>
+                            )}
+                          </div>
+                          <div className="px-3.5 py-3 grid grid-cols-2 gap-x-6 gap-y-2">
+                            {addressAnswers.map((ans: any) => (
+                              <div key={ans.id}>
+                                <p className="text-xs text-slate-400">{ans.question?.label}</p>
+                                <p className="font-semibold text-slate-800 text-sm">{ans.value || <span className="text-slate-300 italic text-xs">não informado</span>}</p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      );
-                    })}
+                      )}
+
+                    </div>
+                  )}
+                </div>
+
+                {userRole !== 'PARTNER' && (
+                  <div className="border-t border-slate-200 pt-5">
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Ações do RH</h3>
+                    <textarea
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none resize-none"
+                      rows={3}
+                      placeholder="Observações ou instruções de correção..."
+                      value={feedback}
+                      onChange={e => setFeedback(e.target.value)}
+                    />
+                    <div className="flex gap-3 mt-3 flex-wrap">
+                      <button onClick={sendFeedback} disabled={saving}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                        Solicitar Correção
+                      </button>
+                      <button onClick={approve} disabled={saving}
+                        className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                        ✓ Aprovar
+                      </button>
+                      <button onClick={remove}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl text-sm border border-red-200 transition">
+                        Excluir
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-
-              {userRole !== 'PARTNER' && (
-                <div className="border-t border-slate-200 pt-5">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Ações do RH</h3>
-                  <textarea
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none resize-none"
-                    rows={3}
-                    placeholder="Observações ou instruções de correção..."
-                    value={feedback}
-                    onChange={e => setFeedback(e.target.value)}
-                  />
-                  <div className="flex gap-3 mt-3 flex-wrap">
-                    <button onClick={sendFeedback} disabled={saving}
-                      className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition">
-                      Solicitar Correção
-                    </button>
-                    <button onClick={approve} disabled={saving}
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition">
-                      ✓ Aprovar
-                    </button>
-                    <button onClick={remove}
-                      className="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl text-sm border border-red-200 transition">
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
