@@ -6,7 +6,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "ts-node prisma/seed.ts",
-    "migrate": "ts-node prisma/migrate-type.ts"
+    "migrate": "ts-node prisma/migrate-type.ts",
+    "db:push": "prisma db push --accept-data-loss"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
