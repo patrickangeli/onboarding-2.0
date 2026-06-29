@@ -25,12 +25,12 @@ app.post('/api/setup', async (req, res) => {
   }
   try {
     const existing = await prisma.user.findUnique({ where: { email: 'admin@empresa.com' } });
-    if (existing) return res.json({ message: 'Setup já realizado.', email: 'admin@empresa.com' });
+    if (existing) return res.json({ message: 'Setup j\u00e1 realizado.', email: 'admin@empresa.com' });
 
     const process = await prisma.onboardingProcess.create({
       data: {
-        title: 'Admissão TI - Padrão',
-        description: 'Fluxo de onboarding para desenvolvedores',
+        title: 'Admiss\u00e3o - Padr\u00e3o',
+        description: 'Fluxo de onboarding padr\u00e3o',
         phases: {
           create: [
             {
@@ -39,31 +39,33 @@ app.post('/api/setup', async (req, res) => {
                 create: [
                   { label: 'Nome Completo', type: 'TEXT', required: true, order: 1 },
                   { label: 'Data de Nascimento', type: 'DATE', required: true, order: 2 },
-                  { label: 'Gênero', type: 'SELECT', required: true, order: 3, options: { create: [{ label: 'Masculino', value: 'M', order: 1 }, { label: 'Feminino', value: 'F', order: 2 }, { label: 'Prefiro não dizer', value: 'NB', order: 3 }] } },
-                  { label: 'Estado Civil', type: 'SELECT', required: true, order: 4, options: { create: [{ label: 'Solteiro(a)', value: 'SOLTEIRO', order: 1 }, { label: 'Casado(a)', value: 'CASADO', order: 2 }, { label: 'Divorciado(a)', value: 'DIVORCIADO', order: 3 }, { label: 'Viúvo(a)', value: 'VIUVO', order: 4 }, { label: 'União Estável', value: 'UNIAO_ESTAVEL', order: 5 }] } }
+                  { label: 'G\u00eanero', type: 'SELECT', required: true, order: 3, options: { create: [{ label: 'Masculino', value: 'M', order: 1 }, { label: 'Feminino', value: 'F', order: 2 }, { label: 'Prefiro n\u00e3o dizer', value: 'NB', order: 3 }] } },
+                  { label: 'Estado Civil', type: 'SELECT', required: true, order: 4, options: { create: [{ label: 'Solteiro(a)', value: 'SOLTEIRO', order: 1 }, { label: 'Casado(a)', value: 'CASADO', order: 2 }, { label: 'Divorciado(a)', value: 'DIVORCIADO', order: 3 }, { label: 'Vi\u00favo(a)', value: 'VIUVO', order: 4 }, { label: 'Uni\u00e3o Est\u00e1vel', value: 'UNIAO_ESTAVEL', order: 5 }] } },
+                  { label: 'Documentos comprobat\u00f3rios (at\u00e9 3 arquivos)', type: 'MULTI_FILE', required: false, order: 5 }
                 ]
               }
             },
             {
-              title: 'Endereço', order: 2,
+              title: 'Endere\u00e7o', order: 2,
               questions: {
                 create: [
                   { label: 'CEP', type: 'CEP', required: true, order: 1 },
                   { label: 'Rua', type: 'TEXT', required: true, order: 2 },
-                  { label: 'Número', type: 'TEXT', required: true, order: 3 },
+                  { label: 'N\u00famero', type: 'TEXT', required: true, order: 3 },
                   { label: 'Complemento', type: 'TEXT', required: false, order: 4 },
                   { label: 'Bairro', type: 'TEXT', required: true, order: 5 },
                   { label: 'Cidade', type: 'TEXT', required: true, order: 6 },
-                  { label: 'Estado', type: 'TEXT', required: true, order: 7 }
+                  { label: 'Estado', type: 'TEXT', required: true, order: 7 },
+                  { label: 'Documentos comprobat\u00f3rios (at\u00e9 3 arquivos)', type: 'MULTI_FILE', required: false, order: 8 }
                 ]
               }
             },
             {
-              title: 'Documentação', order: 3,
+              title: 'Documenta\u00e7\u00e3o', order: 3,
               questions: {
                 create: [
                   { label: 'Foto do RG (Frente e Verso)', type: 'FILE', required: true, order: 1 },
-                  { label: 'Comprovante de Residência', type: 'FILE', required: true, order: 2 },
+                  { label: 'Comprovante de Resid\u00eancia', type: 'FILE', required: true, order: 2 },
                   { label: 'CPF', type: 'FILE', required: true, order: 3 }
                 ]
               }
@@ -85,10 +87,10 @@ app.post('/api/setup', async (req, res) => {
     await prisma.user.create({ data: { name: 'Admin RH', email: 'admin@empresa.com', passwordHash: adminHash, role: 'ADMIN', active: true } });
 
     const partnerHash = await bcrypt.hash('parceiro123', 10);
-    await prisma.user.create({ data: { name: 'Usuário Parceiro', email: 'parceiro@empresa.com', passwordHash: partnerHash, role: 'PARTNER', companyId: company.id, active: true } });
+    await prisma.user.create({ data: { name: 'Usu\u00e1rio Parceiro', email: 'parceiro@empresa.com', passwordHash: partnerHash, role: 'PARTNER', companyId: company.id, active: true } });
 
     return res.json({
-      message: 'Setup concluído!',
+      message: 'Setup conclu\u00eddo!',
       processId: process.id,
       admin: { email: 'admin@empresa.com', password: 'admin123' },
       partner: { email: 'parceiro@empresa.com', password: 'parceiro123' }
@@ -100,13 +102,13 @@ app.post('/api/setup', async (req, res) => {
 });
 
 // -----------------------------------------------
-// MIDDLEWARE DE AUTENTICAÇÃO
+// MIDDLEWARE DE AUTENTICA\u00c7\u00c3O
 // -----------------------------------------------
 
 function authMiddleware(roles: string[] = []) {
   return (req: any, res: any, next: any) => {
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Token não fornecido' });
+    if (!token) return res.status(401).json({ error: 'Token n\u00e3o fornecido' });
     try {
       const decoded: any = jwt.verify(token, JWT_SECRET);
       if (roles.length && !roles.includes(decoded.role)) {
@@ -115,7 +117,7 @@ function authMiddleware(roles: string[] = []) {
       req.user = decoded;
       next();
     } catch {
-      return res.status(401).json({ error: 'Token inválido' });
+      return res.status(401).json({ error: 'Token inv\u00e1lido' });
     }
   };
 }
@@ -128,9 +130,9 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { email }, include: { company: true } });
-    if (!user || !user.active) return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (!user || !user.active) return res.status(401).json({ error: 'Credenciais inv\u00e1lidas' });
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (!valid) return res.status(401).json({ error: 'Credenciais inv\u00e1lidas' });
     const token = jwt.sign(
       { id: user.id, role: user.role, companyId: user.companyId, name: user.name },
       JWT_SECRET,
@@ -146,7 +148,6 @@ app.post('/api/auth/login', async (req, res) => {
 // PROCESSOS
 // -----------------------------------------------
 
-// Rota PÚBLICA — retorna o primeiro processo disponível (usado pelo portal do colaborador)
 app.get('/api/process/first', async (req, res) => {
   try {
     const process = await prisma.onboardingProcess.findFirst({
@@ -187,10 +188,33 @@ app.get('/api/process/:id/structure', async (req, res) => {
         }
       }
     });
-    if (!process) return res.status(404).json({ error: 'Processo não encontrado' });
+    if (!process) return res.status(404).json({ error: 'Processo n\u00e3o encontrado' });
     return res.json(process);
   } catch {
     return res.status(500).json({ error: 'Erro ao buscar estrutura' });
+  }
+});
+
+// -----------------------------------------------
+// CEP LOOKUP (p\u00fablico)
+// -----------------------------------------------
+
+app.get('/api/cep/:cep', async (req, res) => {
+  const cep = req.params.cep.replace(/\D/g, '');
+  if (cep.length !== 8) return res.status(400).json({ error: 'CEP inv\u00e1lido' });
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await r.json() as any;
+    if (data.erro) return res.status(404).json({ error: 'CEP n\u00e3o encontrado' });
+    return res.json({
+      cep: data.cep,
+      street: data.logradouro,
+      neighborhood: data.bairro,
+      city: data.localidade,
+      state: data.uf
+    });
+  } catch {
+    return res.status(500).json({ error: 'Erro ao consultar CEP' });
   }
 });
 
@@ -203,9 +227,9 @@ app.get('/api/employee/check-cpf/:cpf', async (req, res) => {
   try {
     const employee = await prisma.employee.findUnique({
       where: { cpf: cpfLimpo },
-      select: { id: true, hasAccessed: true }
+      select: { id: true, hasAccessed: true, currentPhaseId: true, status: true }
     });
-    if (!employee) return res.status(404).json({ error: 'CPF não encontrado' });
+    if (!employee) return res.status(404).json({ error: 'CPF n\u00e3o encontrado' });
     if (!employee.hasAccessed) {
       await prisma.employee.update({
         where: { cpf: cpfLimpo },
@@ -223,7 +247,7 @@ app.post('/api/employee', async (req, res) => {
   try {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const existing = await prisma.employee.findUnique({ where: { cpf: cpfLimpo } });
-    if (existing) return res.status(400).json({ error: 'Este CPF já possui cadastro!' });
+    if (existing) return res.status(400).json({ error: 'Este CPF j\u00e1 possui cadastro!' });
     const firstPhase = await prisma.phase.findFirst({ where: { processId, order: 1 } });
     if (!firstPhase) return res.status(400).json({ error: 'Processo sem fases.' });
     const employee = await prisma.employee.create({
@@ -248,12 +272,12 @@ app.get('/api/employee/:id/details', async (req, res) => {
         answers: {
           include: {
             question: true,
-            document: { select: { id: true, fileName: true, mimeType: true } }
+            documents: { select: { id: true, fileName: true, mimeType: true } }
           }
         }
       }
     });
-    if (!employee) return res.status(404).json({ error: 'Candidato não encontrado' });
+    if (!employee) return res.status(404).json({ error: 'Candidato n\u00e3o encontrado' });
     return res.json(employee);
   } catch {
     return res.status(500).json({ error: 'Erro ao buscar detalhes.' });
@@ -270,7 +294,7 @@ app.post('/api/employee/address', async (req, res) => {
     });
     return res.json(address);
   } catch {
-    return res.status(500).json({ error: 'Erro ao salvar endereço.' });
+    return res.status(500).json({ error: 'Erro ao salvar endere\u00e7o.' });
   }
 });
 
@@ -281,28 +305,29 @@ app.post('/api/next-step', async (req, res) => {
       where: { id: employeeId },
       include: { currentPhase: { include: { questions: true } }, answers: true }
     });
-    if (!employee) return res.status(404).json({ error: 'Colaborador não encontrado' });
+    if (!employee) return res.status(404).json({ error: 'Colaborador n\u00e3o encontrado' });
     const missing = employee.currentPhase!.questions.filter(q =>
       q.required && !employee.answers.some(a => a.questionId === q.id)
     );
     if (missing.length > 0) {
-      return res.status(400).json({ error: 'Campos obrigatórios não preenchidos.', missing: missing.map(q => q.label) });
+      return res.status(400).json({ error: 'Campos obrigat\u00f3rios n\u00e3o preenchidos.', missing: missing.map(q => q.label) });
     }
     const nextPhase = await prisma.phase.findFirst({
       where: { processId: employee.currentPhase!.processId, order: employee.currentPhase!.order + 1 }
     });
     if (!nextPhase) {
       await prisma.employee.update({ where: { id: employeeId }, data: { status: 'DOCS_SENT' } });
-      return res.json({ message: 'Processo finalizado! Documentos enviados para análise.' });
+      return res.json({ message: 'Processo finalizado! Documentos enviados para an\u00e1lise.' });
     }
     await prisma.employee.update({ where: { id: employeeId }, data: { currentPhaseId: nextPhase.id } });
-    return res.json({ message: 'Fase avançada com sucesso!', nextPhaseId: nextPhase.id });
+    return res.json({ message: 'Fase avan\u00e7ada com sucesso!', nextPhaseId: nextPhase.id });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Erro interno.' });
   }
 });
 
+// Upload de arquivo \u00fanico (FILE)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   const { employeeId, questionId } = req.body as any;
   const file = req.file;
@@ -313,7 +338,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       create: { employeeId, questionId, value: 'ARQUIVO' },
       update: { value: 'ARQUIVO' }
     });
-    const existing = await prisma.document.findUnique({ where: { answerId: answer.id } });
+    const existing = await prisma.document.findFirst({ where: { answerId: answer.id } });
     if (existing) {
       await prisma.document.update({
         where: { id: existing.id },
@@ -331,10 +356,36 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.get('/api/file/:answerId', async (req, res) => {
+// Upload m\u00faltiplo (MULTI_FILE, m\u00e1x 3 arquivos)
+app.post('/api/upload-multi', upload.array('files', 3), async (req, res) => {
+  const { employeeId, questionId } = req.body as any;
+  const files = req.files as Express.Multer.File[];
+  if (!files || files.length === 0) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
   try {
-    const doc = await prisma.document.findUnique({ where: { answerId: req.params.answerId } });
-    if (!doc) return res.status(404).json({ error: 'Arquivo não encontrado' });
+    const answer = await prisma.answer.upsert({
+      where: { employeeId_questionId: { employeeId, questionId } },
+      create: { employeeId, questionId, value: `${files.length} arquivo(s)` },
+      update: { value: `${files.length} arquivo(s)` }
+    });
+    // Remove documentos antigos desta resposta
+    await prisma.document.deleteMany({ where: { answerId: answer.id } });
+    // Salva os novos
+    await Promise.all(files.map(file =>
+      prisma.document.create({
+        data: { fileName: file.originalname, mimeType: file.mimetype, fileData: file.buffer, employeeId, answerId: answer.id }
+      })
+    ));
+    return res.json({ message: `${files.length} arquivo(s) salvo(s) com sucesso!` });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro ao fazer upload.' });
+  }
+});
+
+app.get('/api/file/:documentId', async (req, res) => {
+  try {
+    const doc = await prisma.document.findUnique({ where: { id: req.params.documentId } });
+    if (!doc) return res.status(404).json({ error: 'Arquivo n\u00e3o encontrado' });
     res.setHeader('Content-Type', doc.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${doc.fileName}"`);
     return res.send(doc.fileData);
@@ -442,7 +493,7 @@ app.get('/api/users', authMiddleware(['ADMIN']), async (req, res) => {
     });
     return res.json(users);
   } catch {
-    return res.status(500).json({ error: 'Erro ao buscar usuários.' });
+    return res.status(500).json({ error: 'Erro ao buscar usu\u00e1rios.' });
   }
 });
 
@@ -455,7 +506,7 @@ app.post('/api/users', authMiddleware(['ADMIN']), async (req, res) => {
     });
     return res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
   } catch {
-    return res.status(500).json({ error: 'Erro ao criar usuário.' });
+    return res.status(500).json({ error: 'Erro ao criar usu\u00e1rio.' });
   }
 });
 
