@@ -15,6 +15,92 @@ app.use(express.json());
 app.use(cors());
 
 // -----------------------------------------------
+// SETUP — criar dados iniciais (usar uma vez)
+// -----------------------------------------------
+
+app.post('/api/setup', async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== (process.env.SETUP_SECRET || 'setup-onboarding-2024')) {
+    return res.status(403).json({ error: 'Proibido' });
+  }
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: 'admin@empresa.com' } });
+    if (existing) return res.json({ message: 'Setup já realizado.', email: 'admin@empresa.com' });
+
+    // Criar processo
+    const process = await prisma.onboardingProcess.create({
+      data: {
+        title: 'Admissão TI - Padrão',
+        description: 'Fluxo de onboarding para desenvolvedores',
+        phases: {
+          create: [
+            {
+              title: 'Dados Pessoais', order: 1,
+              questions: {
+                create: [
+                  { label: 'Nome Completo', type: 'TEXT', required: true, order: 1 },
+                  { label: 'Data de Nascimento', type: 'DATE', required: true, order: 2 },
+                  { label: 'Gênero', type: 'SELECT', required: true, order: 3, options: { create: [{ label: 'Masculino', value: 'M', order: 1 }, { label: 'Feminino', value: 'F', order: 2 }, { label: 'Prefiro não dizer', value: 'NB', order: 3 }] } },
+                  { label: 'Estado Civil', type: 'SELECT', required: true, order: 4, options: { create: [{ label: 'Solteiro(a)', value: 'SOLTEIRO', order: 1 }, { label: 'Casado(a)', value: 'CASADO', order: 2 }, { label: 'Divorciado(a)', value: 'DIVORCIADO', order: 3 }, { label: 'Viúvo(a)', value: 'VIUVO', order: 4 }, { label: 'União Estável', value: 'UNIAO_ESTAVEL', order: 5 }] } }
+                ]
+              }
+            },
+            {
+              title: 'Endereço', order: 2,
+              questions: {
+                create: [
+                  { label: 'CEP', type: 'CEP', required: true, order: 1 },
+                  { label: 'Rua', type: 'TEXT', required: true, order: 2 },
+                  { label: 'Número', type: 'TEXT', required: true, order: 3 },
+                  { label: 'Complemento', type: 'TEXT', required: false, order: 4 },
+                  { label: 'Bairro', type: 'TEXT', required: true, order: 5 },
+                  { label: 'Cidade', type: 'TEXT', required: true, order: 6 },
+                  { label: 'Estado', type: 'TEXT', required: true, order: 7 }
+                ]
+              }
+            },
+            {
+              title: 'Documentação', order: 3,
+              questions: {
+                create: [
+                  { label: 'Foto do RG (Frente e Verso)', type: 'FILE', required: true, order: 1 },
+                  { label: 'Comprovante de Residência', type: 'FILE', required: true, order: 2 },
+                  { label: 'CPF', type: 'FILE', required: true, order: 3 }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      include: { phases: true }
+    });
+
+    const company = await prisma.company.create({
+      data: {
+        name: 'Empresa Parceira Demo', slug: 'parceira-demo',
+        phaseAccess: { create: [{ phaseId: process.phases[0].id }, { phaseId: process.phases[1].id }] }
+      }
+    });
+
+    const adminHash = await bcrypt.hash('admin123', 10);
+    await prisma.user.create({ data: { name: 'Admin RH', email: 'admin@empresa.com', passwordHash: adminHash, role: 'ADMIN', active: true } });
+
+    const partnerHash = await bcrypt.hash('parceiro123', 10);
+    await prisma.user.create({ data: { name: 'Usuário Parceiro', email: 'parceiro@empresa.com', passwordHash: partnerHash, role: 'PARTNER', companyId: company.id, active: true } });
+
+    return res.json({
+      message: 'Setup concluído!',
+      processId: process.id,
+      admin: { email: 'admin@empresa.com', password: 'admin123' },
+      partner: { email: 'parceiro@empresa.com', password: 'parceiro123' }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro no setup', details: String(error) });
+  }
+});
+
+// -----------------------------------------------
 // MIDDLEWARE DE AUTENTICAÇÃO
 // -----------------------------------------------
 
