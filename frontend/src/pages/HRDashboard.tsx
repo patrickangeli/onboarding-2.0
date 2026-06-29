@@ -16,6 +16,103 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   REJECTED:    { label: 'Rejeitado',     color: 'bg-red-100 text-red-800' },
 };
 
+function formatCPF(v: string) {
+  return v.replace(/\D/g, '').slice(0, 11)
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+function NewEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [processId, setProcessId] = useState('');
+  const [processes, setProcesses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/processes').then(r => {
+      setProcesses(r.data);
+      if (r.data.length > 0) setProcessId(r.data[0].id);
+    }).catch(() => {});
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!name.trim() || !email.trim() || !cpf.trim()) {
+      setError('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    if (!processId) {
+      setError('Nenhum processo encontrado. Verifique o backend.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/employee', { name, email, cpf, processId });
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao criar colaborador.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800">Novo Colaborador</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition text-xl leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="bg-red-50 text-red-700 text-sm px-4 py-2.5 rounded-lg border border-red-100">{error}</div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo <span className="text-red-500">*</span></label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: João da Silva"
+              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">E-mail <span className="text-red-500">*</span></label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="colaborador@email.com"
+              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">CPF <span className="text-red-500">*</span></label>
+            <input type="text" value={cpf} onChange={e => setCpf(formatCPF(e.target.value))} placeholder="000.000.000-00"
+              className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none font-mono" />
+          </div>
+          {processes.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Processo de Onboarding</label>
+              <select value={processId} onChange={e => setProcessId(e.target.value)}
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+                {processes.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 border border-slate-300 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 transition">
+              Cancelar
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition disabled:opacity-60">
+              {loading ? 'Criando...' : 'Criar Colaborador'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function HRDashboard({ user, onLogout }: Props) {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +120,7 @@ export function HRDashboard({ user, onLogout }: Props) {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCompany, setFilterCompany] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [showNewModal, setShowNewModal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,9 +175,19 @@ export function HRDashboard({ user, onLogout }: Props) {
       </header>
 
       <main className="max-w-screen-xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">Candidatos</h1>
-          <p className="text-slate-500 text-sm mt-1">{candidates.length} candidato(s) no total</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Colaboradores</h1>
+            <p className="text-slate-500 text-sm mt-1">{candidates.length} colaborador(es) no total</p>
+          </div>
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-teal-700 transition shadow-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Novo Colaborador
+          </button>
         </div>
 
         {/* Stats */}
@@ -119,7 +227,7 @@ export function HRDashboard({ user, onLogout }: Props) {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-600">Candidato</th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-600">Colaborador</th>
                   <th className="text-left px-5 py-3 font-semibold text-slate-600">CPF</th>
                   <th className="text-left px-5 py-3 font-semibold text-slate-600">Fase</th>
                   {user.role !== 'PARTNER' && <th className="text-left px-5 py-3 font-semibold text-slate-600">Empresa</th>}
@@ -130,7 +238,7 @@ export function HRDashboard({ user, onLogout }: Props) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Nenhum candidato encontrado.</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Nenhum colaborador encontrado.</td></tr>
                 ) : filtered.map(c => (
                   <tr key={c.id} className="hover:bg-slate-50 transition">
                     <td className="px-5 py-3.5">
@@ -175,6 +283,13 @@ export function HRDashboard({ user, onLogout }: Props) {
           candidateId={selectedId}
           userRole={user.role}
           onClose={() => { setSelectedId(null); load(); }}
+        />
+      )}
+
+      {showNewModal && (
+        <NewEmployeeModal
+          onClose={() => setShowNewModal(false)}
+          onSuccess={() => { load(); }}
         />
       )}
     </div>
