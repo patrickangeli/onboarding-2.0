@@ -148,8 +148,19 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // -----------------------------------------------
-// PROCESSO
+// PROCESSOS
 // -----------------------------------------------
+
+app.get('/api/processes', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req, res) => {
+  try {
+    const processes = await prisma.onboardingProcess.findMany({
+      select: { id: true, title: true, description: true }
+    });
+    return res.json(processes);
+  } catch {
+    return res.status(500).json({ error: 'Erro ao buscar processos.' });
+  }
+});
 
 app.get('/api/process/:id/structure', async (req, res) => {
   const { id } = req.params;
