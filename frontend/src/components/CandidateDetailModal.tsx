@@ -3,9 +3,7 @@ import api from '../api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// Labels que pertencem ao grupo Endereço
 const ADDRESS_LABELS = ['CEP', 'Rua', 'Número', 'Complemento', 'Bairro', 'Cidade', 'Estado'];
-const ADDRESS_GROUP_ID = '__address_group__';
 
 interface Props {
   candidateId: string;
@@ -13,28 +11,77 @@ interface Props {
   onClose: () => void;
 }
 
+// Componente de cada arquivo com preview inline expansível
+function DocPreview({ doc }: { doc: { id: string; fileName: string; mimeType: string } }) {
+  const [open, setOpen] = useState(false);
+  const isPdf = doc.mimeType === 'application/pdf';
+  const isImage = doc.mimeType.startsWith('image/');
+  const url = `${API_BASE}/api/file/${doc.id}`;
+
+  return (
+    <div className="mt-1">
+      {/* Botão do arquivo */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition"
+          style={isPdf
+            ? { color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }
+            : { color: '#0f766e', background: '#f0fdfa', borderColor: '#99f6e4' }
+          }
+          title={open ? 'Fechar preview' : 'Visualizar arquivo'}
+        >
+          {isPdf ? '📄' : '🖼️'} {doc.fileName}
+          <span className="ml-1 text-[10px] opacity-60">{open ? '▲' : '▼'}</span>
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-slate-600 transition"
+          title="Abrir em nova aba"
+        >
+          ↗
+        </a>
+      </div>
+
+      {/* Preview inline */}
+      {open && (
+        <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+          {isImage && (
+            <img
+              src={url}
+              alt={doc.fileName}
+              className="w-full max-h-80 object-contain bg-slate-100"
+            />
+          )}
+          {isPdf && (
+            <iframe
+              src={url}
+              title={doc.fileName}
+              className="w-full h-80"
+              style={{ border: 'none' }}
+            />
+          )}
+          {!isImage && !isPdf && (
+            <p className="text-xs text-slate-400 italic p-3">
+              Preview não disponível para este tipo de arquivo.{' '}
+              <a href={url} target="_blank" rel="noopener noreferrer" className="underline text-teal-600">Abrir em nova aba</a>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DocLinks({ documents }: { documents: { id: string; fileName: string; mimeType: string }[] }) {
   if (!documents || documents.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-2 mt-1">
-      {documents.map((doc) => {
-        const isPdf = doc.mimeType === 'application/pdf';
-        return (
-          <a
-            key={doc.id}
-            href={`${API_BASE}/api/file/${doc.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition"
-            style={isPdf
-              ? { color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }
-              : { color: '#0f766e', background: '#f0fdfa', borderColor: '#99f6e4' }
-            }
-          >
-            {isPdf ? '📄' : '🖼️'} {doc.fileName}
-          </a>
-        );
-      })}
+    <div className="flex flex-col gap-1 mt-1">
+      {documents.map((doc) => (
+        <DocPreview key={doc.id} doc={doc} />
+      ))}
     </div>
   );
 }
@@ -58,7 +105,6 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
   const toggleCorrection = (id: string) =>
     setCorrections(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  // Marcar/desmarcar todos os campos de endereço de uma vez
   const toggleAddressGroup = (questionIds: string[]) => {
     const allMarked = questionIds.every(id => corrections.includes(id));
     if (allMarked) {
@@ -101,7 +147,6 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
         {loading ? (
           <div className="p-12 text-center text-slate-400">Carregando...</div>
         ) : (() => {
-          // Separar respostas de endereço das demais
           const addressAnswers = candidate.answers.filter((a: any) =>
             ADDRESS_LABELS.includes(a.question?.label)
           );
@@ -140,7 +185,6 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
                   ) : (
                     <div className="space-y-2">
 
-                      {/* Respostas comuns (não endereço) */}
                       {otherAnswers.map((ans: any) => {
                         const hasFiles = ans.documents && ans.documents.length > 0;
                         const isFileAnswer = ['FILE', 'MULTI_FILE'].includes(ans.question?.type);
@@ -173,7 +217,6 @@ export function CandidateDetailModal({ candidateId, userRole, onClose }: Props) 
                         );
                       })}
 
-                      {/* Bloco agrupado de endereço */}
                       {addressAnswers.length > 0 && (
                         <div className={`rounded-xl border text-sm ${
                           addressGroupMarked ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'
