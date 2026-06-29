@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 
-const PROCESS_ID = (import.meta as any).env?.VITE_PROCESS_ID || '';
-
 interface Props { onBack: () => void; }
 
 export function CandidateApp({ onBack }: Props) {
@@ -11,6 +9,7 @@ export function CandidateApp({ onBack }: Props) {
   const [cpf, setCpf] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [processId, setProcessId] = useState('');
   const [process, setProcess] = useState<any>(null);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -19,6 +18,16 @@ export function CandidateApp({ onBack }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rhFeedback, setRhFeedback] = useState<{ message: string; corrections: string[] } | null>(null);
+
+  // Busca o primeiro processo disponível ao montar
+  useEffect(() => {
+    api.get('/processes').then(res => {
+      if (res.data && res.data.length > 0) setProcessId(res.data[0].id);
+    }).catch(() => {
+      // sem token, tenta buscar via endpoint público
+      api.get('/process/first').then(r => setProcessId(r.data.id)).catch(() => {});
+    });
+  }, []);
 
   const formatCpf = (v: string) => {
     const d = v.replace(/\D/g, '').slice(0, 11);
@@ -29,8 +38,8 @@ export function CandidateApp({ onBack }: Props) {
   };
 
   useEffect(() => {
-    if (step === 'form' && PROCESS_ID) {
-      api.get(`/process/${PROCESS_ID}/structure`).then(res => setProcess(res.data));
+    if (step === 'form' && processId) {
+      api.get(`/process/${processId}/structure`).then(res => setProcess(res.data));
       api.get(`/employee/${employeeId}/details`).then(d => {
         if (d.data.feedback) setRhFeedback({ message: d.data.feedback, corrections: d.data.corrections || [] });
         const saved: Record<string, string> = {};
@@ -38,7 +47,7 @@ export function CandidateApp({ onBack }: Props) {
         setAnswers(saved);
       }).catch(() => {});
     }
-  }, [step, employeeId]);
+  }, [step, employeeId, processId]);
 
   const handleCpfSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,9 +66,10 @@ export function CandidateApp({ onBack }: Props) {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!processId) { setError('Processo de onboarding não encontrado. Contate o RH.'); return; }
     setLoading(true); setError('');
     try {
-      const res = await api.post('/employee', { name, email, cpf: cpf.replace(/\D/g, ''), processId: PROCESS_ID });
+      const res = await api.post('/employee', { name, email, cpf: cpf.replace(/\D/g, ''), processId });
       setEmployeeId(res.data.id);
       setStep('form');
     } catch (err: any) {
@@ -127,7 +137,7 @@ export function CandidateApp({ onBack }: Props) {
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Portal do Candidato</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Portal do Colaborador</h1>
           <p className="text-slate-500 text-sm mt-1">Insira seu CPF para continuar</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
@@ -266,6 +276,13 @@ export function CandidateApp({ onBack }: Props) {
       </div>
     );
   }
+
+  // carregando formulário
+  if (step === 'form' && !process) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-500">Carregando formulário...</p>
+    </div>
+  );
 
   // TELA CONCLUÍDO
   return (
