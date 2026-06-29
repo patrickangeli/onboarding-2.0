@@ -19,14 +19,9 @@ export function CandidateApp({ onBack }: Props) {
   const [loading, setLoading] = useState(false);
   const [rhFeedback, setRhFeedback] = useState<{ message: string; corrections: string[] } | null>(null);
 
-  // Busca o primeiro processo disponível ao montar
+  // Busca o primeiro processo via rota pública
   useEffect(() => {
-    api.get('/processes').then(res => {
-      if (res.data && res.data.length > 0) setProcessId(res.data[0].id);
-    }).catch(() => {
-      // sem token, tenta buscar via endpoint público
-      api.get('/process/first').then(r => setProcessId(r.data.id)).catch(() => {});
-    });
+    api.get('/process/first').then(r => setProcessId(r.data.id)).catch(() => {});
   }, []);
 
   const formatCpf = (v: string) => {
@@ -38,7 +33,7 @@ export function CandidateApp({ onBack }: Props) {
   };
 
   useEffect(() => {
-    if (step === 'form' && processId) {
+    if (step === 'form' && processId && employeeId) {
       api.get(`/process/${processId}/structure`).then(res => setProcess(res.data));
       api.get(`/employee/${employeeId}/details`).then(d => {
         if (d.data.feedback) setRhFeedback({ message: d.data.feedback, corrections: d.data.corrections || [] });
@@ -66,7 +61,7 @@ export function CandidateApp({ onBack }: Props) {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!processId) { setError('Processo de onboarding não encontrado. Contate o RH.'); return; }
+    if (!processId) { setError('Processo não encontrado. Contate o RH.'); return; }
     setLoading(true); setError('');
     try {
       const res = await api.post('/employee', { name, email, cpf: cpf.replace(/\D/g, ''), processId });

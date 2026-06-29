@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cors());
 
 // -----------------------------------------------
-// SETUP — criar dados iniciais (usar uma vez)
+// SETUP
 // -----------------------------------------------
 
 app.post('/api/setup', async (req, res) => {
@@ -27,7 +27,6 @@ app.post('/api/setup', async (req, res) => {
     const existing = await prisma.user.findUnique({ where: { email: 'admin@empresa.com' } });
     if (existing) return res.json({ message: 'Setup já realizado.', email: 'admin@empresa.com' });
 
-    // Criar processo
     const process = await prisma.onboardingProcess.create({
       data: {
         title: 'Admissão TI - Padrão',
@@ -108,7 +107,6 @@ function authMiddleware(roles: string[] = []) {
   return (req: any, res: any, next: any) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
     try {
       const decoded: any = jwt.verify(token, JWT_SECRET);
       if (roles.length && !roles.includes(decoded.role)) {
@@ -131,16 +129,13 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { email }, include: { company: true } });
     if (!user || !user.active) return res.status(401).json({ error: 'Credenciais inválidas' });
-
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
-
     const token = jwt.sign(
       { id: user.id, role: user.role, companyId: user.companyId, name: user.name },
       JWT_SECRET,
       { expiresIn: '8h' }
     );
-
     return res.json({ token, user: { id: user.id, name: user.name, role: user.role, company: user.company } });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao fazer login' });
@@ -150,6 +145,19 @@ app.post('/api/auth/login', async (req, res) => {
 // -----------------------------------------------
 // PROCESSOS
 // -----------------------------------------------
+
+// Rota PÚBLICA — retorna o primeiro processo disponível (usado pelo portal do colaborador)
+app.get('/api/process/first', async (req, res) => {
+  try {
+    const process = await prisma.onboardingProcess.findFirst({
+      select: { id: true, title: true }
+    });
+    if (!process) return res.status(404).json({ error: 'Nenhum processo encontrado.' });
+    return res.json(process);
+  } catch {
+    return res.status(500).json({ error: 'Erro ao buscar processo.' });
+  }
+});
 
 app.get('/api/processes', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req, res) => {
   try {
@@ -198,14 +206,12 @@ app.get('/api/employee/check-cpf/:cpf', async (req, res) => {
       select: { id: true, hasAccessed: true }
     });
     if (!employee) return res.status(404).json({ error: 'CPF não encontrado' });
-
     if (!employee.hasAccessed) {
       await prisma.employee.update({
         where: { cpf: cpfLimpo },
         data: { hasAccessed: true, firstAccessAt: new Date() }
       });
     }
-
     return res.json(employee);
   } catch {
     return res.status(500).json({ error: 'Erro ao verificar CPF' });
@@ -218,10 +224,8 @@ app.post('/api/employee', async (req, res) => {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const existing = await prisma.employee.findUnique({ where: { cpf: cpfLimpo } });
     if (existing) return res.status(400).json({ error: 'Este CPF já possui cadastro!' });
-
     const firstPhase = await prisma.phase.findFirst({ where: { processId, order: 1 } });
     if (!firstPhase) return res.status(400).json({ error: 'Processo sem fases.' });
-
     const employee = await prisma.employee.create({
       data: { name, email, cpf: cpfLimpo, currentPhaseId: firstPhase.id, status: 'IN_PROGRESS' }
     });
@@ -278,23 +282,19 @@ app.post('/api/next-step', async (req, res) => {
       include: { currentPhase: { include: { questions: true } }, answers: true }
     });
     if (!employee) return res.status(404).json({ error: 'Colaborador não encontrado' });
-
     const missing = employee.currentPhase!.questions.filter(q =>
       q.required && !employee.answers.some(a => a.questionId === q.id)
     );
     if (missing.length > 0) {
       return res.status(400).json({ error: 'Campos obrigatórios não preenchidos.', missing: missing.map(q => q.label) });
     }
-
     const nextPhase = await prisma.phase.findFirst({
       where: { processId: employee.currentPhase!.processId, order: employee.currentPhase!.order + 1 }
     });
-
     if (!nextPhase) {
       await prisma.employee.update({ where: { id: employeeId }, data: { status: 'DOCS_SENT' } });
       return res.json({ message: 'Processo finalizado! Documentos enviados para análise.' });
     }
-
     await prisma.employee.update({ where: { id: employeeId }, data: { currentPhaseId: nextPhase.id } });
     return res.json({ message: 'Fase avançada com sucesso!', nextPhaseId: nextPhase.id });
   } catch (error) {
@@ -358,7 +358,7 @@ app.post('/api/answer/text', async (req, res) => {
 });
 
 // -----------------------------------------------
-// RH / ADMIN — rotas protegidas
+// RH / ADMIN
 // -----------------------------------------------
 
 app.get('/api/employees', authMiddleware(['ADMIN', 'HR', 'PARTNER']), async (req: any, res) => {
@@ -409,10 +409,6 @@ app.delete('/api/employee/:id', authMiddleware(['ADMIN']), async (req, res) => {
   }
 });
 
-// -----------------------------------------------
-// GESTÃO DE EMPRESAS (só ADMIN)
-// -----------------------------------------------
-
 app.get('/api/companies', authMiddleware(['ADMIN']), async (req, res) => {
   try {
     const companies = await prisma.company.findMany({
@@ -429,8 +425,7 @@ app.post('/api/companies', authMiddleware(['ADMIN']), async (req, res) => {
   try {
     const company = await prisma.company.create({
       data: {
-        name,
-        slug,
+        name, slug,
         phaseAccess: { create: phaseIds.map((phaseId: string) => ({ phaseId })) }
       }
     });
